@@ -1,38 +1,51 @@
 @echo off
 
 REM Root directory
-@REM set ROOT=log_pattern_detection_tool
+@REM set ROOT=distributed_web_cache
 set ROOT=.
 
 REM Create directories if they do not exist
 call :create_folder "%ROOT%"
-call :create_folder "%ROOT%\bin"
 call :create_folder "%ROOT%\config"
+call :create_folder "%ROOT%\core"
 call :create_folder "%ROOT%\docs"
+call :create_folder "%ROOT%\examples"
+call :create_folder "%ROOT%\exceptions"
 call :create_folder "%ROOT%\logs"
-call :create_folder "%ROOT%\src"
+call :create_folder "%ROOT%\storage"
 call :create_folder "%ROOT%\tests"
+call :create_folder "%ROOT%\utils"
 
 REM Create files only if they do not exist
 REM Python source files (with header)
+call :create_py_file "%ROOT%\main.py"
 call :create_py_file "%ROOT%\setup.py"
 
-call :create_py_file "%ROOT%\bin\run_detection.py"
+call :create_py_file "%ROOT%\config\defaults.py"
+call :create_py_file "%ROOT%\config\engine_config.py"
 
-call :create_py_file "%ROOT%\config\config.py"
+call :create_py_file "%ROOT%\core\cache_node.py"
+call :create_py_file "%ROOT%\core\cache_controller.py"
+call :create_py_file "%ROOT%\core\eviction.py"
+call :create_py_file "%ROOT%\core\distributed_cache.py"
 
-call :create_py_file "%ROOT%\src\__init__.py"
-call :create_py_file "%ROOT%\src\log_reader.py"
-call :create_py_file "%ROOT%\src\pattern_detector.py"
-call :create_py_file "%ROOT%\src\anomaly_detector.py"
-call :create_py_file "%ROOT%\src\storage.py"
-call :create_py_file "%ROOT%\src\report.py"
+call :create_py_file "%ROOT%\examples\basic_cache.py"
+call :create_py_file "%ROOT%\examples\distributed_demo.py"
+call :create_py_file "%ROOT%\examples\interactive_cli.py"
 
-call :create_py_file "%ROOT%\tests\__init__.py"
-call :create_py_file "%ROOT%\tests\test_log_reader.py"
-call :create_py_file "%ROOT%\tests\test_pattern_detector.py"
-call :create_py_file "%ROOT%\tests\test_anomaly_detector.py"
-call :create_py_file "%ROOT%\tests\test_storage.py"
+call :create_py_file "%ROOT%\exceptions\erros.py"
+
+call :create_py_file "%ROOT%\storage\frequency_storage.py"
+
+call :create_py_file "%ROOT%\tests\test_cache_node.py"
+call :create_py_file "%ROOT%\tests\test_distributed_cache.py"
+call :create_py_file "%ROOT%\tests\test_eviction.py"
+call :create_py_file "%ROOT%\tests\test_frequency.py"
+call :create_py_file "%ROOT%\tests\test_utils.py"
+
+call :create_py_file "%ROOT%\utils\logging.py"
+call :create_py_file "%ROOT%\utils\normalizer.py"
+call :create_py_file "%ROOT%\utils\validators.py"
 
 REM Non-Python files (empty)
 call :create_file "%ROOT%\logs\tool_execution.log"
@@ -79,7 +92,7 @@ echo # -*- Python -*- Compatibility Header
 echo #
 echo # Copyright ^(C^) 2023 Developer Jarvis ^(Pen Name^)
 echo #
-echo # This file is part of the Log Pattern Detection Tool Library. This library is free
+echo # This file is part of the Distributed Web Cache Library. This library is free
 echo # software; you can redistribute it and/or modify it under the
 echo # terms of the GNU General Public License as published by the
 echo # Free Software Foundation; either version 3, or ^(at your option^)
@@ -95,8 +108,8 @@ echo # along with this program. If not, see ^<https://www.gnu.org/licenses/^>.
 echo #
 echo # SPDX-License-Identifier: GPL-3.0-or-later
 echo #
-echo # Log Pattern Detection Tool - Find patterns and anomalies in large log files
-echo #                       Skills: streaming I/O, algorithms, regex
+echo # Distributed Web Cache - HTTP caching layer with eviction policies ^(LRU/LFU^)
+echo #                   Skills: networking, caching algorithms, concurrency
 echo #
 echo # Author: Developer Jarvis ^(Pen Name^)
 echo # Contact: https://github.com/DeveloperJarvis
