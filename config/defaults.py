@@ -30,8 +30,22 @@
 # --------------------------------------------------
 # defaults MODULE
 # --------------------------------------------------
-
+"""
+Default configuration values for Distributed Web Cache
+"""
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
 
+
+# Default max entries per cache node
+DEFAULT_MAX_SIZE: int = 100
+
+# Default evivtion policy: "LRU" or "LFU"
+DEFAULT_EVICTION_POLICY: str = "LRU"
+
+# Default TTL (time-to-live) for cached entries (seconds)
+DEFAULT_TTL: int = 3600
+
+# Default number of nodes in distributed cache
+DEFAULT_NODE_COUNT: int = 3

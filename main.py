@@ -39,6 +39,7 @@ CLI Entry point for Distributed Web Cache
 import argparse
 from core.distributed_cache import DistributedCache
 from config.engine_config import CacheConfig
+from exceptions.errors import CacheMissError
 
 
 def parse_args():
@@ -81,17 +82,17 @@ def main():
     cache = DistributedCache(config=config)
 
     if args.key and args.value is not None:
-        cache.set(args.key, args.value)
+        cache.put(args.key, args.value.encode())
         print(f"✅ Stored key='{args.key}' with "
               f"value='{args.value}'")
     elif args.key:
-        value = cache.get(args.key)
-        if value is None:
-            print(f"❌ Key '{args.key}' not found in cache")
-        else:
+        try:
+            value = cache.get(args.key)
             print(f"🔹 Key='{args.key}' -> Value='{value}'")
+        except CacheMissError:
+            print(f"❌ Key '{args.key}' not found in cache")
     else:
-        print("⚠️ Please provide a key with --key "
+        print("⚠️  Please provide a key with --key "
               "[and optionally --value]")
 
 

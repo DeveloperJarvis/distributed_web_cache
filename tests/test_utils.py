@@ -34,4 +34,40 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+import pytest
+from utils.normalizer import normalize_key, normalize_url
+from utils.validators import (
+    validate_key,
+    validate_cache_size,
+    validate_eviction_policy,
+)
+from exceptions.errors import (
+    InvalidKeyError,
+    InvalidSizeError,
+    InvalidPolicyError,
+)
 
+
+def test_normalize_key():
+    assert normalize_key("  ABC ") == "abc"
+
+
+def test_normalize_key_none():
+    assert normalize_key(None) == ""
+
+
+def test_validate_key_failure():
+    with pytest.raises(InvalidKeyError):
+        validate_key("")
+
+
+def test_validate_cache_size():
+    validate_cache_size(10)
+    with pytest.raises(InvalidSizeError):
+        validate_cache_size(0)
+
+
+def test_validate_eviction_policy():
+    validate_eviction_policy("LRU")
+    with pytest.raises(InvalidPolicyError):
+        validate_eviction_policy("FIFO")

@@ -30,8 +30,59 @@
 # --------------------------------------------------
 # frequency_storage MODULE
 # --------------------------------------------------
-
+"""
+Frequency storage for cache access patterns.
+Used primarily by LFU eviction policy
+"""
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from threading import Lock
+from typing import Dict
+from exceptions.errors import StorageError
 
+
+# --------------------------------------------------
+# frequency storage
+# --------------------------------------------------
+class FrequencyStorage:
+    """
+    Thread-safe in-memory frequency counter.
+    """
+
+    def __init__(self) -> None:
+        self._frequencies: Dict[str, int] = {}
+        self._lock = Lock()
+    
+    def increment(self, key: str) -> int:
+        """
+        Increment access frequency for a key.
+        """
+        if not key:
+            raise StorageError("Key cannot be empty")
+        
+        with self._lock:
+            self._frequencies[key] = (
+                self._frequencies.get(key, 0) + 1)
+            return self._frequencies[key]
+    
+    def get(self, key: str) -> int:
+        """
+        Get frequency count for a key.
+        """
+        with self._lock:
+            return self._frequencies.get(key, 0)
+    
+    def remove(self, key: str) -> None:
+        """
+        Remove a key from frequency tracking.
+        """
+        with self._lock:
+            self._frequencies.pop(key, None)
+        
+    def clear(self) -> None:
+        """
+        Clear all frequency data.
+        """
+        with self._lock:
+            self._frequencies.clear()

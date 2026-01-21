@@ -30,8 +30,36 @@
 # --------------------------------------------------
 # cache_node MODULE
 # --------------------------------------------------
-
+"""
+Cache node abstraction.
+Represents a single cache entry.
+"""
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+import time
+from dataclasses import dataclass, field
 
+
+# --------------------------------------------------
+# cache node
+# --------------------------------------------------
+@dataclass
+class CacheNode:
+    """
+    Represents a single cached object.
+    """
+    key: str
+    value: bytes
+    size: int
+
+    frequency: int = 0
+    last_accessed: float = field(default_factory=time.time)
+    created_at: float = field(default_factory=time.time)
+
+    def touch(self) -> None:
+        """
+        Update access metadata.
+        """
+        self.frequency += 1
+        self.last_accessed = time.time()

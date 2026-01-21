@@ -30,8 +30,69 @@
 # --------------------------------------------------
 # interactive_cli MODULE
 # --------------------------------------------------
-
+"""
+Interactive CLI for Distributed Web Cache.
+"""
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from config.engine_config import CacheConfig
+from core.distributed_cache import DistributedCache
+from exceptions.errors import CacheMissError
 
+
+def main() -> None:
+    config = CacheConfig(
+        node_count=2,
+        max_size=512,
+        eviction_policy="LRU",
+    )
+
+    cache = DistributedCache(config)
+
+    print("🌐 Distributed Web Cache CLI")
+    print("Commands:")
+    print(" PUT <key> <value>")
+    print(" GET <key>")
+    print(" STATS")
+    print(" EXIT\n")
+
+    while True:
+        try:
+            command = input("> ").strip()
+            if not command:
+                continue
+
+            if command.upper() == "EXIT":
+                print("Goodbye 👋🏻")
+                break
+
+            if command.upper() == "STATS":
+                for node, stats in cache.stats().items():
+                    print(f"{node}: {stats}")
+                continue
+
+            parts = command.split(maxsplit=2)
+            action = parts[0].upper()
+
+            if action == "PUT" and len(parts) == 3:
+                key, value = parts[1], parts[2]
+                cache.put(key, value.encode())
+                print(f"✔️ Stored [{key}]")
+            
+            elif action == "GET" and len(parts) == 2:
+                key = parts[1]
+                value = cache.get(key)
+                print(f"✔️ {key} -> {value}")
+            
+            else:
+                print("❌ Invalid command")
+        
+        except CacheMissError as e:
+            print(f"⚠️  {e}")
+        except Exception as e:
+            print(f"❌ Error: {e}")
+
+
+if __name__ == "__main__":
+    main()

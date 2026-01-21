@@ -21,34 +21,41 @@ REM Python source files (with header)
 call :create_py_file "%ROOT%\main.py"
 call :create_py_file "%ROOT%\setup.py"
 
+call :create_py_file "%ROOT%\config\__init__.py"
+call :create_py_file "%ROOT%\config\config.py"
 call :create_py_file "%ROOT%\config\defaults.py"
 call :create_py_file "%ROOT%\config\engine_config.py"
 
-call :create_py_file "%ROOT%\core\cache_node.py"
+call :create_py_file "%ROOT%\core\__init__.py"
 call :create_py_file "%ROOT%\core\cache_controller.py"
-call :create_py_file "%ROOT%\core\eviction.py"
+call :create_py_file "%ROOT%\core\cache_node.py"
 call :create_py_file "%ROOT%\core\distributed_cache.py"
+call :create_py_file "%ROOT%\core\eviction.py"
 
 call :create_py_file "%ROOT%\examples\basic_cache.py"
 call :create_py_file "%ROOT%\examples\distributed_demo.py"
 call :create_py_file "%ROOT%\examples\interactive_cli.py"
 
-call :create_py_file "%ROOT%\exceptions\erros.py"
+call :create_py_file "%ROOT%\exceptions\__init__.py"
+call :create_py_file "%ROOT%\exceptions\errors.py"
 
+call :create_py_file "%ROOT%\storage\__init__.py"
 call :create_py_file "%ROOT%\storage\frequency_storage.py"
 
+call :create_py_file "%ROOT%\tests\__init__.py"
 call :create_py_file "%ROOT%\tests\test_cache_node.py"
 call :create_py_file "%ROOT%\tests\test_distributed_cache.py"
 call :create_py_file "%ROOT%\tests\test_eviction.py"
 call :create_py_file "%ROOT%\tests\test_frequency.py"
 call :create_py_file "%ROOT%\tests\test_utils.py"
 
+call :create_py_file "%ROOT%\utils\__init__.py"
 call :create_py_file "%ROOT%\utils\logging.py"
 call :create_py_file "%ROOT%\utils\normalizer.py"
 call :create_py_file "%ROOT%\utils\validators.py"
 
 REM Non-Python files (empty)
-call :create_file "%ROOT%\logs\tool_execution.log"
+call :create_file "%ROOT%\logs\cache.log"
 
 call :create_file "%ROOT%\requirements.txt"
 call :create_file "%ROOT%\README.md"

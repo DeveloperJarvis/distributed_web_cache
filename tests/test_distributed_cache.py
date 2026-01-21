@@ -34,4 +34,33 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+import pytest
+from core.distributed_cache import DistributedCache
+from config.engine_config import CacheConfig
+from exceptions.errors import CacheMissError, InvalidPolicyError
 
+
+def test_put_and_get_across_nodes():
+    config = CacheConfig(node_count=2, max_size=100)
+    cache = DistributedCache(config)
+
+    cache.put("key1", b"value1")
+    cache.put("key2", b"value2")
+
+    assert cache.get("key1") == b"value1"
+    assert cache.get("key2") == b"value2"
+
+
+def test_cache_miss_raises_error():
+    config = CacheConfig(node_count=2, max_size=100)
+    cache = DistributedCache(config)
+
+    with pytest.raises(CacheMissError):
+        cache.get("missing")
+    
+
+def test_invalid_eviction_policy():
+    with pytest.raises(InvalidPolicyError):
+        DistributedCache(
+            CacheConfig(eviction_policy="INVALID")
+        )

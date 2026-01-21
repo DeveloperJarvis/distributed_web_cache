@@ -30,8 +30,73 @@
 # --------------------------------------------------
 # distributed_cache MODULE
 # --------------------------------------------------
-
+"""
+Distributed cache abstraction.
+Coordinates multiple cache nodes.
+"""
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from typing import Dict
+import hashlib
 
+from core.cache_controller import CacheController
+from core.eviction import LRUEviction, LFUEviction
+from config.engine_config import CacheConfig
+from exceptions.errors import InvalidPolicyError
+
+
+# --------------------------------------------------
+# distributed cache
+# --------------------------------------------------
+class DistributedCache:
+    """
+    Distributed cache using sharding.
+    """
+
+    def __init__(self, config: CacheConfig) -> None:
+        self._nodes: Dict[int, CacheController] = {}
+        self._num_nodes = config.node_count
+
+        eviction = self._create_eviction_policy(
+            config.eviction_policy
+        )
+
+        for i in range(self._num_nodes):
+            self._nodes[i] = CacheController(
+                max_size=config.max_size,
+                eviction_policy=eviction,
+            )
+    
+    def _create_eviction_policy(self, policy: str):
+        if policy == "LRU":
+            return LRUEviction()
+        if policy == "LFU":
+            return LFUEviction()
+        raise InvalidPolicyError(
+            f"Unknown eviction policy: {policy}"
+        )
+    
+    def _get_node(self, key: str) -> CacheController:
+        """
+        Hash-based sharding.
+        """
+        node_id = int(
+            hashlib.md5(key.encode()).hexdigest(),
+            16,
+        ) % self._num_nodes
+        return self._nodes[node_id]
+
+    def get(self, key: str) -> bytes:
+        node = self._get_node(key)
+        return node.get(key).value
+    
+    def put(self, key: str, value: bytes) -> None:
+        node = self._get_node(key)
+        node.put(key, value)
+    
+    def stats(self) -> dict:
+        return {
+            f"node_{i}": node.stats()
+            for i, node in self._nodes.items()
+        }

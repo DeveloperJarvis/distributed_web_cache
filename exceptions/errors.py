@@ -28,72 +28,79 @@
 # --------------------------------------------------
 
 # --------------------------------------------------
-# eviction MODULE
+# erros MODULE
 # --------------------------------------------------
 """
-Eviction policy implementations.
-Supports LRU and LFU.
+Custom exception hierarchy for Distributed Web Cache.
 """
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
-from abc import ABC, abstractmethod
-from typing import Dict
-
-from core.cache_node import CacheNode
-from exceptions.errors import EvictionError
 
 
 # --------------------------------------------------
-# eviction policy
+# distributed cache error
 # --------------------------------------------------
-class EvictionPolicy(ABC):
+class DistributedCacheError(Exception):
     """
-    Base eviction policy.
+    Base exception for all distributed cache errors.
     """
-
-    @abstractmethod
-    def evict(self, cache: Dict[str, CacheNode]) -> str:
-        """
-        Decide which key to evict.
-        """
-        raise NotImplementedError
+    pass
 
 
 # --------------------------------------------------
-# LRU eviction
+# validation errors
 # --------------------------------------------------
-class LRUEviction(EvictionPolicy):
+class InvalidKeyError(DistributedCacheError):
     """
-    Least Recently Used eviction.
+    Raised when a cache key is invalid.
     """
+    pass
 
-    def evict(self, cache: Dict[str, CacheNode]) -> str:
-        if not cache:
-            raise EvictionError(
-                "Cannot evict from empty cache"
-            )
-        return min(
-            cache.items(),
-            key=lambda item: item[1].last_accessed,
-        )[0]
+
+class InvalidPolicyError(DistributedCacheError):
+    """
+    Raised when an unsupported eviction policy is provided.
+    """
+    pass
+
+
+class InvalidSizeError(DistributedCacheError):
+    """
+    Raised when cache size configuration is invalid.
+    """
+    pass
 
 
 # --------------------------------------------------
-# LFU eviction
+# storage errors
 # --------------------------------------------------
-class LFUEviction(EvictionPolicy):
+class StorageError(DistributedCacheError):
     """
-    Least Frequently Used eviction.
+    Raised for storage-related failures.
     """
+    pass
 
-    def evict(self, cache: Dict[str, CacheNode]) -> str:
-        if not cache:
-            raise EvictionError(
-                "Cannot evict from empty cache"
-            )
-        return min(
-            cache.items(),
-            key=lambda item: (item[1].frequency,
-                            item[1].last_accessed),
-        )[0]
+
+# --------------------------------------------------
+# cache operation errors
+# --------------------------------------------------
+class CacheMissError(DistributedCacheError):
+    """
+    Raised when a requested key is not found in cache.
+    """
+    pass
+
+
+class CacheNodeError(DistributedCacheError):
+    """
+    Raised for cache node-specific failures.
+    """
+    pass
+
+
+class EvictionError(DistributedCacheError):
+    """
+    Raised when eviction fails or is misconfigured.
+    """
+    pass

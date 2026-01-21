@@ -28,10 +28,19 @@
 # --------------------------------------------------
 
 # --------------------------------------------------
-# erros MODULE
+# config MODULE
 # --------------------------------------------------
-
+"""
+Basic configurations
+"""
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+import os
 
+
+PARENT_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..")
+)
+LOG_DIR = os.path.join(PARENT_DIR, "logs")
+LOG_FILE = os.path.join(LOG_DIR, "cache.log")

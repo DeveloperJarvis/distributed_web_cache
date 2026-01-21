@@ -30,8 +30,35 @@
 # --------------------------------------------------
 # basic_cache MODULE
 # --------------------------------------------------
-
+"""
+Basic cache usage example (single node).
+"""
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from config.engine_config import CacheConfig
+from core.distributed_cache import DistributedCache
 
+
+def main() -> None:
+    config = CacheConfig(
+        node_count=1,
+        max_size=1024,
+        eviction_policy="LRU",
+    )
+
+    cache = DistributedCache(config)
+    print("🔹 Putting values into cache")
+    cache.put("a", b"apple")
+    cache.put("b", b"banana")
+
+    print("🔹 Fetching values")
+    print("a ->", cache.get("a"))
+    print("b ->", cache.get("b"))
+
+    print("\n📊 Cache Stats:")
+    print(cache.stats())
+
+
+if __name__ == "__main__":
+    main()

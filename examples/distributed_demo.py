@@ -30,8 +30,46 @@
 # --------------------------------------------------
 # distributed_demo MODULE
 # --------------------------------------------------
-
+"""
+Demonstration of distributed caching across nodes.
+"""
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from config.engine_config import CacheConfig
+from core.distributed_cache import DistributedCache
 
+
+def main() -> None:
+    config = CacheConfig(
+        node_count=3,
+        max_size=256,
+        eviction_policy="LFU",
+    )
+
+    cache = DistributedCache(config)
+
+    keys = [
+        "user:1",
+        "user:2",
+        "session:1",
+        "product:9",
+        "order:42",
+    ]
+
+    print("🔹 Inserting keys into distributed cache")
+    for key in keys:
+        cache.put(key, key.encode())
+    
+    print("\n🔹 Access pattern (to affect LFU)")
+    cache.get("user:1")
+    cache.get("user:1")
+    cache.get("session:1")
+
+    print("\n📊 Distributed Cache Stats:")
+    for node, stats in cache.stats().items():
+        print(f"{node}: {stats}")
+
+
+if __name__ == "__main__":
+    main()

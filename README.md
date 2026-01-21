@@ -4,6 +4,44 @@
 
 ---
 
+## 🏃🏻‍♂️ How to run
+
+```bash
+# setup environment
+python -m venv .env
+# start the environment
+.env\Scripts\activate   # Windows
+# OR
+source .env/bin/activate    # Linux/ Ubuntu
+
+# run setup
+pip install -e .
+# setup for dev
+pip install -e .[dev]
+
+# run main
+python main.py --key <key>
+python main.py --key <key> --value <value>
+
+# run examples
+python -m examples.basic_cache
+python -m examples.distributed_demo
+python -m examples.interactive_cli
+```
+
+---
+
+## 🧪 How to test
+
+```bash
+# make sure env is up
+# setup is for dev
+# run tests
+pytest -v
+```
+
+---
+
 ## **Features**
 
 - 🔹 **HTTP Request Caching**: Cache responses for frequently requested URLs

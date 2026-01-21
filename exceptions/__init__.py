@@ -28,36 +28,10 @@
 # --------------------------------------------------
 
 # --------------------------------------------------
-# test_frequency MODULE
+# __init__ MODULE
 # --------------------------------------------------
 
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
-import pytest
-from storage.frequency_storage import FrequencyStorage
-from exceptions.errors import StorageError
 
-
-def test_frequency_increment():
-    store = FrequencyStorage()
-    assert store.increment("a") == 1
-    assert store.increment("a") == 2
-
-
-def test_frequency_get_default():
-    store = FrequencyStorage()
-    assert store.get("missing") == 0
-
-
-def test_frequency_remove():
-    store = FrequencyStorage()
-    store.increment("a")
-    store.remove("a")
-    assert store.get("a") == 0
-
-
-def test_frequency_empty_key_error():
-    store = FrequencyStorage()
-    with pytest.raises(StorageError):
-        store.increment("")

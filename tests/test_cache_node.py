@@ -34,4 +34,26 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+import pytest
+import time
+from core.cache_node import CacheNode
 
+
+def test_cache_node_initial_state():
+    node = CacheNode(key="a", value=b"apple", size=5,)
+
+    assert node.key == "a"
+    assert node.value == b"apple"
+    assert node.size == 5
+    assert node.frequency == 0
+
+
+def test_cache_node_touch_updates_metadata():
+    node = CacheNode(key="a", value=b"apple", size=5,)
+    old_access = node.last_accessed
+    time.sleep(0.1)
+
+    node.touch()
+
+    assert node.frequency == 1
+    assert node.last_accessed > old_access

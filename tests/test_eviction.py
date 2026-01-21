@@ -34,4 +34,42 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+import pytest
+import time
+from core.cache_node import CacheNode
+from core.eviction import LRUEviction, LFUEviction
+from exceptions.errors import EvictionError
 
+
+def test_lru_eviction():
+    eviction = LRUEviction()
+    cache = {
+        "a": CacheNode("a", b"a", 1),
+        "b": CacheNode("b", b"b", 1),
+    }
+
+    cache["a"].touch()
+    time.sleep(0.01)
+    cache["b"].touch()
+
+    assert eviction.evict(cache) == "a"
+
+
+def test_lfu_eviction():
+    eviction = LFUEviction()
+    cache = {
+        "a": CacheNode("a", b"a", 1),
+        "b": CacheNode("b", b"b", 1),
+    }
+
+    cache["a"].touch()
+    cache["a"].touch()
+    cache["b"].touch()
+
+    assert eviction.evict(cache) == "b"
+
+
+def test_eviction_empty_cache():
+    eviction = LRUEviction()
+    with pytest.raises(EvictionError):
+        eviction.evict({})

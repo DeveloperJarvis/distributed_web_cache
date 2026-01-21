@@ -1,0 +1,832 @@
+# main.py:
+"""
+CLI Entry point for Distributed Web Cache
+"""
+import argparse
+from core.distributed_cache import DistributedCache
+from config.engine_config import CacheConfig
+from exceptions.errors import CacheMissError
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Distributed Web Cache CLI"
+    )
+    parser.add_argument(
+        "--key",
+        type=str,
+        help="Cache key to fetch/store",
+    )
+    parser.add_argument(
+        "--value",
+        type=str,
+        default=None,
+        help="Value to store in cache (if provided)",
+    )
+    parser.add_argument(
+        "--policy",
+        type=str,
+        choices=["LRU", "LFU"],
+        default="LRU",
+        help="Eviction policy",
+    )
+    parser.add_argument(
+        "--max-size",
+        type=int,
+        default=100,
+        help="Maximum entries per cache node",
+    )
+    return parser.parse_args()
+def main():
+    args = parse_args()
+    config = CacheConfig(
+        max_size=args.max_size,
+        eviction_policy=args.policy,
+    )
+    cache = DistributedCache(config=config)
+    if args.key and args.value is not None:
+        cache.put(args.key, args.value.encode())
+        print(f"✅ Stored key='{args.key}' with "
+              f"value='{args.value}'")
+    elif args.key:
+        try:
+            value = cache.get(args.key)
+            print(f"🔹 Key='{args.key}' -> Value='{value}'")
+        except CacheMissError:
+            print(f"❌ Key '{args.key}' not found in cache")
+    else:
+        print("⚠️  Please provide a key with --key "
+              "[and optionally --value]")
+if __name__ == "__main__":
+    main()
+
+
+# setup.py:
+"""
+Distributed Web Cache
+Setup script
+"""
+from setuptools import setup, find_packages
+from pathlib import Path
+ROOT = Path(__file__).parent
+setup(
+    name="distributed-web-cache",
+    version="0.1.0",
+    description="HTTP caching layer with distributed nodes and eviction policies (LRU/LFU)",
+    long_description=(ROOT / "README.md").read_text(
+        encoding="utf-8"
+    ),
+    long_description_content_type="text/markdown",
+    author="Developer Jarvis",
+    author_email="developerjarvis@github.com",
+    url="https://github.com/DeveloperJarvis/distributed_web_cache",
+    license="GPL-3.0-or-later",
+    packages=find_packages(
+        exclude=["tests*", "examples*", "logs*"]
+    ),
+    python_requires=">=3.9",
+    install_requires=[
+        "typing-extensions>=4.0.0"
+    ],
+    extras_require={
+        "dev": [
+            "pytest",
+            "black",
+            "flake8",
+            "mypy",
+        ]
+    },
+    entry_points={
+        "console_scripts": [
+            "distributed-cache=main:main"
+        ]
+    },
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Appproved :: GNU General Public License v3 or later",
+        "Operating System :: OS Independent",
+        "Topic :: Software Developement :: Libraries",
+        "Topic :: System :: Networking :: Caching",
+    ],
+    include_package_data=True,
+    zip_safe=False,
+)
+
+
+# config\__init__.py:
+
+
+
+# config\config.py:
+"""
+Basic configurations
+"""
+import os
+PARENT_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..")
+)
+LOG_DIR = os.path.join(PARENT_DIR, "logs")
+LOG_FILE = os.path.join(LOG_DIR, "cache.log")
+
+
+# config\defaults.py:
+"""
+Default configuration values for Distributed Web Cache
+"""
+DEFAULT_MAX_SIZE: int = 100
+DEFAULT_EVICTION_POLICY: str = "LRU"
+DEFAULT_TTL: int = 3600
+DEFAULT_NODE_COUNT: int = 3
+
+
+# config\engine_config.py:
+"""
+Cache configuration module
+"""
+from dataclasses import dataclass, field
+from config.defaults import (
+    DEFAULT_MAX_SIZE,
+    DEFAULT_EVICTION_POLICY,
+    DEFAULT_TTL,
+    DEFAULT_NODE_COUNT,
+)
+from exceptions.errors import InvalidPolicyError
+@dataclass(frozen=True)
+class CacheConfig:
+    """
+    Configuration object for Distributed Web Cache.
+    Attributes:
+        max_size (int): Max entries per node
+        eviction_policy (str): Eviction strategy ("LRU" or "LFU")
+        ttl (int): Time-to-live for cache entries in seconds
+        node_count (int): Number of cache nodes
+    """
+    max_size: int = DEFAULT_MAX_SIZE
+    eviction_policy: str = DEFAULT_EVICTION_POLICY
+    ttl: int=DEFAULT_TTL
+    node_count: int = DEFAULT_NODE_COUNT
+    def __post_init__(self):
+        if self.max_size <= 0:
+            raise ValueError(
+                "max size must be greater than zero"
+            )
+        if self.eviction_policy not in ("LRU", "LFU"):
+            raise InvalidPolicyError(
+                "eviction_policy mist be either 'LRU' or 'LFU'"
+            )
+        if self.ttl <= 0:
+            raise ValueError("ttl must be greater than zero")
+        if self.node_count <= 0:
+            raise ValueError("node_count must be greater than zero")
+
+
+# core\__init__.py:
+
+
+
+# core\cache_controller.py:
+"""
+Cache controller for a single node.
+Thread-safe cache operations.
+"""
+import threading
+from typing import Dict, Optional
+from core.cache_node import CacheNode
+from core.eviction import EvictionPolicy
+from exceptions.errors import (
+    CacheMissError,
+    InvalidSizeError,
+)
+from utils.validators import validate_key
+class CacheController:
+    """
+    Controls cache storage, eviction and access.
+    """
+    def __init__(
+            self,
+            max_size: int,
+            eviction_policy: EvictionPolicy,
+        ) -> None:
+        if max_size <= 0:
+            raise InvalidSizeError(
+                "Cache size must be positive"
+            )
+        self._cache: Dict[str, CacheNode] = {}
+        self._max_size = max_size
+        self._current_size = 0
+        self._eviction_policy = eviction_policy
+        self._lock = threading.RLock()
+    def get(self, key: str) -> CacheNode:
+        validate_key(key)
+        with self._lock:
+            if key not in self._cache:
+                raise CacheMissError(
+                    f"Cache miss for key: {key}"
+                )
+            node = self._cache[key]
+            node.touch()
+            return node
+    def put(self, key: str, value: bytes) -> None:
+        validate_key(key)
+        size = len(value)
+        with self._lock:
+            while self._current_size + size > self._max_size:
+                evicted_key = self._eviction_policy.evict(
+                    self._cache
+                )
+                self._remove(evicted_key)
+            node = CacheNode(
+                key=key,
+                value=value,
+                size=size,
+            )
+            node.touch()
+            self._cache[key] = node
+            self._current_size += size
+    def _remove(self, key: str) -> None:
+        node = self._cache.pop(key)
+        self._current_size -= node.size
+    def stats(self) -> str:
+        with self._lock:
+            return {
+                "items": len(self._cache),
+                "current_size": self._current_size,
+                "max_size": self._max_size,
+            }
+
+
+# core\cache_node.py:
+"""
+Cache node abstraction.
+Represents a single cache entry.
+"""
+import time
+from dataclasses import dataclass, field
+@dataclass
+class CacheNode:
+    """
+    Represents a single cached object.
+    """
+    key: str
+    value: bytes
+    size: int
+    frequency: int = 0
+    last_accessed: float = field(default_factory=time.time)
+    created_at: float = field(default_factory=time.time)
+    def touch(self) -> None:
+        """
+        Update access metadata.
+        """
+        self.frequency += 1
+        self.last_accessed = time.time()
+
+
+# core\distributed_cache.py:
+"""
+Distributed cache abstraction.
+Coordinates multiple cache nodes.
+"""
+from typing import Dict
+import hashlib
+from core.cache_controller import CacheController
+from core.eviction import LRUEviction, LFUEviction
+from config.engine_config import CacheConfig
+from exceptions.errors import InvalidPolicyError
+class DistributedCache:
+    """
+    Distributed cache using sharding.
+    """
+    def __init__(self, config: CacheConfig) -> None:
+        self._nodes: Dict[int, CacheController] = {}
+        self._num_nodes = config.node_count
+        eviction = self._create_eviction_policy(
+            config.eviction_policy
+        )
+        for i in range(self._num_nodes):
+            self._nodes[i] = CacheController(
+                max_size=config.max_size,
+                eviction_policy=eviction,
+            )
+    def _create_eviction_policy(self, policy: str):
+        if policy == "LRU":
+            return LRUEviction()
+        if policy == "LFU":
+            return LFUEviction()
+        raise InvalidPolicyError(
+            f"Unknown eviction policy: {policy}"
+        )
+    def _get_node(self, key: str) -> CacheController:
+        """
+        Hash-based sharding.
+        """
+        node_id = int(
+            hashlib.md5(key.encode()).hexdigest(),
+            16,
+        ) % self._num_nodes
+        return self._nodes[node_id]
+    def get(self, key: str) -> bytes:
+        node = self._get_node(key)
+        return node.get(key).value
+    def put(self, key: str, value: bytes) -> None:
+        node = self._get_node(key)
+        node.put(key, value)
+    def stats(self) -> dict:
+        return {
+            f"node_{i}": node.stats()
+            for i, node in self._nodes.items()
+        }
+
+
+# core\eviction.py:
+"""
+Eviction policy implementations.
+Supports LRU and LFU.
+"""
+from abc import ABC, abstractmethod
+from typing import Dict
+from core.cache_node import CacheNode
+from exceptions.errors import EvictionError
+class EvictionPolicy(ABC):
+    """
+    Base eviction policy.
+    """
+    @abstractmethod
+    def evict(self, cache: Dict[str, CacheNode]) -> str:
+        """
+        Decide which key to evict.
+        """
+        raise NotImplementedError
+class LRUEviction(EvictionPolicy):
+    """
+    Least Recently Used eviction.
+    """
+    def evict(self, cache: Dict[str, CacheNode]) -> str:
+        if not cache:
+            raise EvictionError(
+                "Cannot evict from empty cache"
+            )
+        return min(
+            cache.items(),
+            key=lambda item: item[1].last_accessed,
+        )[0]
+class LFUEviction(EvictionPolicy):
+    """
+    Least Frequently Used eviction.
+    """
+    def evict(self, cache: Dict[str, CacheNode]) -> str:
+        if not cache:
+            raise EvictionError(
+                "Cannot evict from empty cache"
+            )
+        return min(
+            cache.items(),
+            key=lambda item: (item[1].frequency,
+                            item[1].last_accessed),
+        )[0]
+
+
+# examples\basic_cache.py:
+"""
+Basic cache usage example (single node).
+"""
+from config.engine_config import CacheConfig
+from core.distributed_cache import DistributedCache
+def main() -> None:
+    config = CacheConfig(
+        node_count=1,
+        max_size=1024,
+        eviction_policy="LRU",
+    )
+    cache = DistributedCache(config)
+    print("🔹 Putting values into cache")
+    cache.put("a", b"apple")
+    cache.put("b", b"banana")
+    print("🔹 Fetching values")
+    print("a ->", cache.get("a"))
+    print("b ->", cache.get("b"))
+    print("\n📊 Cache Stats:")
+    print(cache.stats())
+if __name__ == "__main__":
+    main()
+
+
+# examples\distributed_demo.py:
+"""
+Demonstration of distributed caching across nodes.
+"""
+from config.engine_config import CacheConfig
+from core.distributed_cache import DistributedCache
+def main() -> None:
+    config = CacheConfig(
+        node_count=3,
+        max_size=256,
+        eviction_policy="LFU",
+    )
+    cache = DistributedCache(config)
+    keys = [
+        "user:1",
+        "user:2",
+        "session:1",
+        "product:9",
+        "order:42",
+    ]
+    print("🔹 Inserting keys into distributed cache")
+    for key in keys:
+        cache.put(key, key.encode())
+    print("\n🔹 Access pattern (to affect LFU)")
+    cache.get("user:1")
+    cache.get("user:1")
+    cache.get("session:1")
+    print("\n📊 Distributed Cache Stats:")
+    for node, stats in cache.stats().items():
+        print(f"{node}: {stats}")
+if __name__ == "__main__":
+    main()
+
+
+# examples\interactive_cli.py:
+"""
+Interactive CLI for Distributed Web Cache.
+"""
+from config.engine_config import CacheConfig
+from core.distributed_cache import DistributedCache
+from exceptions.errors import CacheMissError
+def main() -> None:
+    config = CacheConfig(
+        node_count=2,
+        max_size=512,
+        eviction_policy="LRU",
+    )
+    cache = DistributedCache(config)
+    print("🌐 Distributed Web Cache CLI")
+    print("Commands:")
+    print(" PUT <key> <value>")
+    print(" GET <key>")
+    print(" STATS")
+    print(" EXIT\n")
+    while True:
+        try:
+            command = input("> ").strip()
+            if not command:
+                continue
+            if command.upper() == "EXIT":
+                print("Goodbye 👋🏻")
+                break
+            if command.upper() == "STATS":
+                for node, stats in cache.stats().items():
+                    print(f"{node}: {stats}")
+                continue
+            parts = command.split(maxsplit=2)
+            action = parts[0].upper()
+            if action == "PUT" and len(parts) == 3:
+                key, value = parts[1], parts[2]
+                cache.put(key, value.encode())
+                print(f"✔️ Stored [{key}]")
+            elif action == "GET" and len(parts) == 2:
+                key = parts[1]
+                value = cache.get(key)
+                print(f"✔️ {key} -> {value}")
+            else:
+                print("❌ Invalid command")
+        except CacheMissError as e:
+            print(f"⚠️  {e}")
+        except Exception as e:
+            print(f"❌ Error: {e}")
+if __name__ == "__main__":
+    main()
+
+
+# exceptions\__init__.py:
+
+
+
+# exceptions\errors.py:
+"""
+Custom exception hierarchy for Distributed Web Cache.
+"""
+class DistributedCacheError(Exception):
+    """
+    Base exception for all distributed cache errors.
+    """
+    pass
+class InvalidKeyError(DistributedCacheError):
+    """
+    Raised when a cache key is invalid.
+    """
+    pass
+class InvalidPolicyError(DistributedCacheError):
+    """
+    Raised when an unsupported eviction policy is provided.
+    """
+    pass
+class InvalidSizeError(DistributedCacheError):
+    """
+    Raised when cache size configuration is invalid.
+    """
+    pass
+class StorageError(DistributedCacheError):
+    """
+    Raised for storage-related failures.
+    """
+    pass
+class CacheMissError(DistributedCacheError):
+    """
+    Raised when a requested key is not found in cache.
+    """
+    pass
+class CacheNodeError(DistributedCacheError):
+    """
+    Raised for cache node-specific failures.
+    """
+    pass
+class EvictionError(DistributedCacheError):
+    """
+    Raised when eviction fails or is misconfigured.
+    """
+    pass
+
+
+# storage\__init__.py:
+
+
+
+# storage\frequency_storage.py:
+"""
+Frequency storage for cache access patterns.
+Used primarily by LFU eviction policy
+"""
+from threading import Lock
+from typing import Dict
+from exceptions.errors import StorageError
+class FrequencyStorage:
+    """
+    Thread-safe in-memory frequency counter.
+    """
+    def __init__(self) -> None:
+        self._frequencies: Dict[str, int] = {}
+        self._lock = Lock()
+    def increment(self, key: str) -> int:
+        """
+        Increment access frequency for a key.
+        """
+        if not key:
+            raise StorageError("Key cannot be empty")
+        with self._lock:
+            self._frequencies[key] = (
+                self._frequencies.get(key, 0) + 1)
+            return self._frequencies[key]
+    def get(self, key: str) -> int:
+        """
+        Get frequency count for a key.
+        """
+        with self._lock:
+            return self._frequencies.get(key, 0)
+    def remove(self, key: str) -> None:
+        """
+        Remove a key from frequency tracking.
+        """
+        with self._lock:
+            self._frequencies.pop(key, None)
+    def clear(self) -> None:
+        """
+        Clear all frequency data.
+        """
+        with self._lock:
+            self._frequencies.clear()
+
+
+# tests\__init__.py:
+
+
+
+# tests\test_cache_node.py:
+import pytest
+import time
+from core.cache_node import CacheNode
+def test_cache_node_initial_state():
+    node = CacheNode(key="a", value=b"apple", size=5,)
+    assert node.key == "a"
+    assert node.value == b"apple"
+    assert node.size == 5
+    assert node.frequency == 0
+def test_cache_node_touch_updates_metadata():
+    node = CacheNode(key="a", value=b"apple", size=5,)
+    old_access = node.last_accessed
+    time.sleep(0.1)
+    node.touch()
+    assert node.frequency == 1
+    assert node.last_accessed > old_access
+
+
+# tests\test_distributed_cache.py:
+import pytest
+from core.distributed_cache import DistributedCache
+from config.engine_config import CacheConfig
+from exceptions.errors import CacheMissError, InvalidPolicyError
+def test_put_and_get_across_nodes():
+    config = CacheConfig(node_count=2, max_size=100)
+    cache = DistributedCache(config)
+    cache.put("key1", b"value1")
+    cache.put("key2", b"value2")
+    assert cache.get("key1") == b"value1"
+    assert cache.get("key2") == b"value2"
+def test_cache_miss_raises_error():
+    config = CacheConfig(node_count=2, max_size=100)
+    cache = DistributedCache(config)
+    with pytest.raises(CacheMissError):
+        cache.get("missing")
+def test_invalid_eviction_policy():
+    with pytest.raises(InvalidPolicyError):
+        DistributedCache(
+            CacheConfig(eviction_policy="INVALID")
+        )
+
+
+# tests\test_eviction.py:
+import pytest
+import time
+from core.cache_node import CacheNode
+from core.eviction import LRUEviction, LFUEviction
+from exceptions.errors import EvictionError
+def test_lru_eviction():
+    eviction = LRUEviction()
+    cache = {
+        "a": CacheNode("a", b"a", 1),
+        "b": CacheNode("b", b"b", 1),
+    }
+    cache["a"].touch()
+    time.sleep(0.01)
+    cache["b"].touch()
+    assert eviction.evict(cache) == "a"
+def test_lfu_eviction():
+    eviction = LFUEviction()
+    cache = {
+        "a": CacheNode("a", b"a", 1),
+        "b": CacheNode("b", b"b", 1),
+    }
+    cache["a"].touch()
+    cache["a"].touch()
+    cache["b"].touch()
+    assert eviction.evict(cache) == "b"
+def test_eviction_empty_cache():
+    eviction = LRUEviction()
+    with pytest.raises(EvictionError):
+        eviction.evict({})
+
+
+# tests\test_frequency.py:
+import pytest
+from storage.frequency_storage import FrequencyStorage
+from exceptions.errors import StorageError
+def test_frequency_increment():
+    store = FrequencyStorage()
+    assert store.increment("a") == 1
+    assert store.increment("a") == 2
+def test_frequency_get_default():
+    store = FrequencyStorage()
+    assert store.get("missing") == 0
+def test_frequency_remove():
+    store = FrequencyStorage()
+    store.increment("a")
+    store.remove("a")
+    assert store.get("a") == 0
+def test_frequency_empty_key_error():
+    store = FrequencyStorage()
+    with pytest.raises(StorageError):
+        store.increment("")
+
+
+# tests\test_utils.py:
+import pytest
+from utils.normalizer import normalize_key, normalize_url
+from utils.validators import (
+    validate_key,
+    validate_cache_size,
+    validate_eviction_policy,
+)
+from exceptions.errors import (
+    InvalidKeyError,
+    InvalidSizeError,
+    InvalidPolicyError,
+)
+def test_normalize_key():
+    assert normalize_key("  ABC ") == "abc"
+def test_normalize_key_none():
+    assert normalize_key(None) == ""
+def test_validate_key_failure():
+    with pytest.raises(InvalidKeyError):
+        validate_key("")
+def test_validate_cache_size():
+    validate_cache_size(10)
+    with pytest.raises(InvalidSizeError):
+        validate_cache_size(0)
+def test_validate_eviction_policy():
+    validate_eviction_policy("LRU")
+    with pytest.raises(InvalidPolicyError):
+        validate_eviction_policy("FIFO")
+
+
+# utils\__init__.py:
+
+
+
+# utils\logging.py:
+"""
+Logging utilities for Distributed Web Cache.
+"""
+import logging
+import os
+from typing import Optional
+from config.engine_config import CacheConfig
+from config.config import (LOG_DIR, LOG_FILE)
+_LOGGERS = {}
+def get_logger(
+        name: str,
+        config: Optional[CacheConfig] = None,
+    ) -> logging.Logger:
+    """
+    Returns a configured singleton logger instance.
+    """
+    if name in _LOGGERS:
+        return _LOGGERS[name]
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    formatter = logging.Formatter(
+        "[%(asctime)s] [%(levelname)s] %(name)s: %(message)s"
+    )
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    os.makedirs(LOG_DIR, exist_ok=True)
+    file_handler = logging.FileHandler(LOG_FILE)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    _LOGGERS[name] = logger
+    return logger
+
+
+# utils\normalizer.py:
+"""
+Normalization utilities for cache keys and HTTP resources.
+"""
+from exceptions.errors import InvalidKeyError
+def normalize_key(key: str) -> str:
+    """
+    Normalize cache keys for consistent hashing and lookup.
+    - Strips whitespace
+    - Converts to lowercase
+    """
+    if key is None:
+        return ""
+    if not isinstance(key, str):
+        raise InvalidKeyError("Cache must be a string")
+    return key.strip().lower()
+def normalize_url(url: str) -> str:
+    """
+    Normalize HTTP URLs before caching.
+    """
+    if url is None:
+        return ""
+    if not isinstance(url, str):
+        raise TypeError("URL must be a string")
+    return url.strip()
+
+
+# utils\validators.py:
+"""
+Validation helpers for Distributed Web Cache.
+"""
+from exceptions.errors import (
+    InvalidKeyError,
+    InvalidPolicyError,
+    InvalidSizeError,
+)
+def validate_key(key: str) -> None:
+    """
+    Validate cache key.
+    """
+    if not isinstance(key, str):
+        raise InvalidKeyError("Cache key must be a string")
+    if not key.strip():
+        raise InvalidKeyError("Cache key cannot be empty")
+def validate_eviction_policy(policy: str) -> None:
+    """
+    Validate eviction policy.
+    """
+    if policy not in ("LRU", "LFU"):
+        raise InvalidPolicyError(
+            "Eviction policy must be 'LRU' or 'LFU'"
+        )
+def validate_cache_size(size: int) -> None:
+    """
+    Validate cache size.
+    """
+    if not isinstance(size, int):
+        raise InvalidSizeError(
+            "Cache size must be an integer"
+        )
+    if size <= 0:
+        raise InvalidSizeError(
+            "Cache size must be greater than zero"
+        )
+
+

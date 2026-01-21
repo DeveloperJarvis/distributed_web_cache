@@ -30,8 +30,50 @@
 # --------------------------------------------------
 # logging MODULE
 # --------------------------------------------------
-
+"""
+Logging utilities for Distributed Web Cache.
+"""
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+import logging
+import os
+from typing import Optional
+from config.engine_config import CacheConfig
+from config.config import (LOG_DIR, LOG_FILE)
 
+
+_LOGGERS = {}
+
+
+def get_logger(
+        name: str,
+        config: Optional[CacheConfig] = None,
+    ) -> logging.Logger:
+    """
+    Returns a configured singleton logger instance.
+    """
+    if name in _LOGGERS:
+        return _LOGGERS[name]
+    
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+
+    formatter = logging.Formatter(
+        "[%(asctime)s] [%(levelname)s] %(name)s: %(message)s"
+    )
+
+    # Console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    # File handler
+    os.makedirs(LOG_DIR, exist_ok=True)
+    file_handler = logging.FileHandler(LOG_FILE)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+
+    _LOGGERS[name] = logger
+    return logger

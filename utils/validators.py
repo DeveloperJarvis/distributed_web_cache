@@ -30,8 +30,48 @@
 # --------------------------------------------------
 # validators MODULE
 # --------------------------------------------------
-
+"""
+Validation helpers for Distributed Web Cache.
+"""
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from exceptions.errors import (
+    InvalidKeyError,
+    InvalidPolicyError,
+    InvalidSizeError,
+)
 
+
+def validate_key(key: str) -> None:
+    """
+    Validate cache key.
+    """
+    if not isinstance(key, str):
+        raise InvalidKeyError("Cache key must be a string")
+    if not key.strip():
+        raise InvalidKeyError("Cache key cannot be empty")
+
+
+def validate_eviction_policy(policy: str) -> None:
+    """
+    Validate eviction policy.
+    """
+    if policy not in ("LRU", "LFU"):
+        raise InvalidPolicyError(
+            "Eviction policy must be 'LRU' or 'LFU'"
+        )
+
+
+def validate_cache_size(size: int) -> None:
+    """
+    Validate cache size.
+    """
+    if not isinstance(size, int):
+        raise InvalidSizeError(
+            "Cache size must be an integer"
+        )
+    if size <= 0:
+        raise InvalidSizeError(
+            "Cache size must be greater than zero"
+        )

@@ -30,8 +30,38 @@
 # --------------------------------------------------
 # normalizer MODULE
 # --------------------------------------------------
-
+"""
+Normalization utilities for cache keys and HTTP resources.
+"""
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from exceptions.errors import InvalidKeyError
 
+
+def normalize_key(key: str) -> str:
+    """
+    Normalize cache keys for consistent hashing and lookup.
+    - Strips whitespace
+    - Converts to lowercase
+    """
+    if key is None:
+        return ""
+    
+    if not isinstance(key, str):
+        raise InvalidKeyError("Cache must be a string")
+    
+    return key.strip().lower()
+
+
+def normalize_url(url: str) -> str:
+    """
+    Normalize HTTP URLs before caching.
+    """
+    if url is None:
+        return ""
+    
+    if not isinstance(url, str):
+        raise TypeError("URL must be a string")
+    
+    return url.strip()
